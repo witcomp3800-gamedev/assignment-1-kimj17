@@ -1,4 +1,4 @@
-Window Assignment1Soln 1280 800
+Window Assignment1Soln 1280 700
 Font assets/Orbitron.ttf 18 1.0 1.0 1.0
 Circle CGreen 100 100 -3 3 0.0 1.0 0.0 50
 Circle CCyan 400 600 -2 1 0.0 1.0 1.0 75
