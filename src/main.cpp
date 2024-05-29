@@ -1,5 +1,5 @@
 //Justin Kim
-//didnt finish the gui where you can edit the individual shapes
+//didn't get the scaling to work for both of the shapes
 
 #include <include/raylib.h>
 #include <imgui/imgui.h>
@@ -16,19 +16,23 @@ class Shape
 {
 public:
     std::string name;
+    std::string newName = name;
     float posX;
     float posY;
     float sX;
     float sY;
     float color[3];
     float scaleFactor;
-    bool active;
+    bool active = true;
+    bool selected = false;
 
     virtual void move(int windowWidth, int windowHeight) {};
 
     virtual void draw() {};
 
     virtual void drawText(Font font, int fontSize, float fontColor[3]) {};
+
+    virtual void setGui() {};
 
     std::string getName() {
         return name;
@@ -42,6 +46,7 @@ class Circle : public Shape {
 public:
     Circle(std::string n, float x, float y, float speedX, float speedY, float rC, float gC, float bC, float r) {
         name = n;
+        newName = name;
         posX = x;
         posY = y;
         sX = speedX;
@@ -56,23 +61,37 @@ public:
     };
 
     void move(int windowWidth, int windowHeight) override {
-        if (posX - radius <= 0 || posX + radius >= windowWidth) {
-            sX *= -1;
+        if (active) {
+            if (posX - radius <= 0 || posX + radius >= windowWidth) {
+                sX *= -1;
+            }
+            if (posY - radius <= 0 || posY + radius >= windowHeight) {
+                sY *= -1;
+            }
+            posX += sX;
+            posY += sY;
         }
-        if (posY - radius <= 0 || posY + radius >= windowHeight) {
-            sY *= -1;
-        }
-        posX += sX;
-        posY += sY;
     }
 
     void draw() override {
-        DrawCircle((int)posX, (int)posY, radius, ColorFromNormalized({ color[0],color[1],color[2],1.0f }));
-        };
+        if (active) {
+            DrawCircle((int)posX, (int)posY, radius * scaleFactor, ColorFromNormalized({ color[0],color[1],color[2],1.0f }));
+        }   
+     };
 
     void drawText(Font font, int fontSize, float fontColor[3]) override {
-        Vector2 textSize = MeasureTextEx(font, name.c_str(), fontSize, 1);
-        DrawTextEx(font, name.c_str(), { posX - (textSize.x / 2), posY - (textSize.y / 2) }, fontSize, 1, ColorFromNormalized({ fontColor[0],fontColor[1],fontColor[2],1.0f }));
+        if (active) {
+            Vector2 textSize = MeasureTextEx(font, newName.c_str(), fontSize, 1);
+            DrawTextEx(font, newName.c_str(), { posX - (textSize.x / 2), posY - (textSize.y / 2) }, fontSize, 1, ColorFromNormalized({ fontColor[0],fontColor[1],fontColor[2],1.0f }));
+        }
+    }
+
+    void setGui() override {
+        ImGui::Checkbox("Active", &active);
+        ImGui::SliderFloat("Scale", &scaleFactor, 0.1f, 5.0f);
+        ImGui::DragFloat2("Velocity", &sX, 0.1f);
+        ImGui::ColorEdit3("Color", color);
+        ImGui::InputText("Name", &newName);
     }
 };
 
@@ -84,6 +103,7 @@ class Rectangles : public Shape {
 public:
     Rectangles(std::string n, float x, float y, float speedX, float speedY, float rC, float gC, float bC, float w, float h) {
         name = n;
+        newName = name;
         posX = x;
         posY = y;
         sX = speedX;
@@ -101,23 +121,38 @@ public:
     };
 
     void move(int windowWidth, int windowHeight) override {
-        if (posX <= 0 || posX + width >= windowWidth) {
-            sX *= -1;
-        }
-        if (posY <= 0 || posY + height >= windowHeight) {
-            sY *= -1;
-        }
-        posX += sX;
-        posY += sY;
+
+        if (active) {
+            if (posX <= 0 || posX + width >= windowWidth) {
+                sX *= -1;
+            }
+            if (posY <= 0 || posY + height >= windowHeight) {
+                sY *= -1;
+            }
+            posX += sX;
+            posY += sY;
+        }   
     }
 
     void draw() override {
-        DrawRectangle((int)posX, (int)posY, width, height, ColorFromNormalized({ color[0],color[1],color[2],1.0f }));
+        if (active) {
+            DrawRectangle((int)posX, (int)posY, width * scaleFactor, height * scaleFactor, ColorFromNormalized({ color[0],color[1],color[2],1.0f }));
+        }
     };
 
     void drawText(Font font, int fontSize, float fontColor[3]) override {
-        Vector2 textSize = MeasureTextEx(font, name.c_str(), fontSize, 1);
-        DrawTextEx(font, name.c_str(), { (posX + width / 2) - (textSize.x / 2), (posY + height / 2) - (textSize.y / 2) }, fontSize, 1, ColorFromNormalized({ fontColor[0],fontColor[1],fontColor[2],1.0f }));
+        if (active) {
+            Vector2 textSize = MeasureTextEx(font, newName.c_str(), fontSize, 1);
+            DrawTextEx(font, newName.c_str(), { (posX + (width*scaleFactor) / 2) - (textSize.x / 2), (posY + (height*scaleFactor) / 2) - (textSize.y / 2) }, fontSize, 1, ColorFromNormalized({ fontColor[0],fontColor[1],fontColor[2],1.0f }));
+        }
+    }
+
+    void setGui() override {
+        ImGui::Checkbox("Active", &active);
+        ImGui::SliderFloat("Scale", &scaleFactor, 0.1f, 5.0f);
+        ImGui::DragFloat2("Velocity", &sX, 0.1f);
+        ImGui::ColorEdit3("Color", color);
+        ImGui::InputText("Name", &newName);
     }
 };
 
@@ -281,24 +316,31 @@ int main(void)
 
                     ImGui::Text("Select Shape");
 
-                    Shape* currShape = shapes[0];
+                    static int currIndex = 0;
+
+                    Shape* currShape = shapes[currIndex];
                     
-                    if (ImGui::BeginCombo("Shape", NULL)) // The second parameter is the label previewed before opening the combo.
+                    if (ImGui::BeginCombo("Shape", currShape->getName().c_str())) 
                     {
                         for (int i = 0; i < shapes.size(); i++)
                         {
-                            bool is_selected = (currShape == shapes[i]); // You can store your selection however you want, outside or inside your objects
+                            const bool is_selected = (currIndex == i);
                             if (ImGui::Selectable(shapes[i]->getName().c_str(), is_selected)) {
-                                currShape = shapes[i];
+                                currIndex = i;
+                                shapes[currIndex]->selected = true;
                             }
 
                             if (is_selected) {
-                                ImGui::SetItemDefaultFocus();   // You may set the initial focus when opening the combo (scrolling + for keyboard navigation support)
+                                ImGui::SetItemDefaultFocus();
                             }
                         }
-                                
                         ImGui::EndCombo();
                     }
+
+                    ImGui::BeginGroup();
+                    shapes[currIndex]->setGui();
+                    ImGui::EndGroup();
+
 
                     //slider, again directly modifies the value and limites between 0 and 300 for this example
 //                    ImGui::SliderFloat("Radius",&circRadius,0.0f,300.0f);
